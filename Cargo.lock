@@ -543,8 +543,10 @@ dependencies = [
 name = "bevy_awc_hello"
 version = "0.1.0"
 dependencies = [
+ "actix-codec",
  "awc",
  "bevy",
+ "crossbeam-channel",
  "futures-util",
  "thiserror",
  "tokio",
