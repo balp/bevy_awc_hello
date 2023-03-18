@@ -1,18 +1,18 @@
-use bevy::app::App;
-use bevy::{prelude::*, utils::Uuid};
 use awc::{Client, ws};
+use bevy::{prelude::*};
+use bevy::app::App;
 use bevy::prelude::CoreSet::PreUpdate;
 use futures_util::{SinkExt as _, StreamExt as _};
-use tokio::{
-    runtime::Runtime,
-};
+use tokio::runtime::Runtime;
 
-fn main() {
-    App::new()
-        .add_plugins(MinimalPlugins)
-        .add_system(hello_world)
-        .run();
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+enum AppState {
+    #[default]
+    Disconnected,
+    Connecting,
+    Connected,
 }
+
 
 async fn ws_connect() {
     let (_resp, mut connection) = Client::new()
@@ -30,19 +30,25 @@ async fn ws_connect() {
     assert_eq!(response, ws::Frame::Text("Echo".as_bytes().into()));
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 struct WsClient {
     runtime: Runtime,
 }
 
-impl WsClient {
-    pub fn new() -> Self {
+impl Default for WsClient {
+    fn default() -> Self {
         Self {
             runtime: tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("Could not build runtime"),
         }
+    }
+}
+
+impl WsClient {
+    pub fn connect(&mut self) {
+        println!("connect and stuff");
     }
 }
 
@@ -82,7 +88,7 @@ struct WsClientPlugin;
 impl Plugin for WsClientPlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(WsClient::new())
+            .init_resource::<WsClient>()
             .add_event::<WsNetworkEvent>()
             .init_resource::<WsNetworkSettings>()
             .add_system((send_client_network_events).in_base_set(PreUpdate))
@@ -103,6 +109,37 @@ fn handle_connection_event(
     mut events: EventWriter<WsNetworkEvent>,
 ) {}
 
-fn hello_world() {
+
+
+fn main() {
+    App::new()
+        .add_state::<AppState>()
+        .add_plugins(MinimalPlugins)
+        .add_plugin(WsClientPlugin)
+        .add_system(hello_world)
+        .run();
+}
+
+
+fn hello_world(
+    app_state: Res<State<AppState>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut ws_client: ResMut<WsClient>,
+) {
+    match app_state.0 {
+        AppState::Disconnected => {
+            println!("Start connect...");
+            ws_client.connect();
+            next_state.set(AppState::Connecting);
+        },
+        AppState::Connecting => {
+            println!("Connecting...");
+            next_state.set(AppState::Connected);
+        },
+        AppState::Connected => {
+            println!("Connected....");
+            todo!()
+        },
+    }
     debug!("tick");
 }
